@@ -61,7 +61,7 @@ def batch_social_organization_scraper(provinces: str) -> str:
     """
     try:
         print(f"batch_social_organization_scraper工具被调用")
-        print(f"接收到的参数: {repr(provinces)}")
+        print(f"接收到的参数: {repr(provinces)}") 
         
         # 清理参数，保留逗号分隔符
         provinces_clean = clean_province_param(provinces)
