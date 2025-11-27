@@ -94,7 +94,8 @@ async def set_filters(page, province, keyword):
 
         # 点击空白区域关闭可能的下拉菜单
         print("点击空白区域关闭下拉菜单...")
-        await page.mouse.click(200, 150)
+        # 点击页面最左侧边缘（x=10, y=页面中间）
+        await page.mouse.click(10, 300)
         await human_wait(0.5, 1)
 
         # 选择省份
