@@ -39,13 +39,13 @@ def initialize_agent():
     # 获取标准React prompt模板
     base_prompt = hub.pull("hwchase17/react")
     
-    # 在标准模板前添加我们的自定义指令
+    # 创建自定义指令
     custom_instruction = """
 你是一个社会组织数据抓取助手。用户会输入省份名称，你需要调用相应的工具来抓取数据。
 
 使用规则：
 - 当用户输入单个省份时，使用social_organization_scraper工具
-- 当用户输入"所有省份"、"全国"或要求抓取全部数据时，使用batch_social_organization_scraper工具
+- 当用户输入"所有省份"、"全国"或要求抓取全部数据时，使用batch_social_organization_scraper工具，参数是31个省份！
 - 当用户输入多个具体省份时，使用batch_social_organization_scraper工具
 - 当用户询问可抓取的省份时，使用get_available_provinces工具
 
@@ -53,7 +53,7 @@ def initialize_agent():
 
 """
     
-    # 创建新的prompt模板，将自定义指令添加到标准模板前面
+    # 合并自定义指令和标准模板
     custom_prompt_template = custom_instruction + base_prompt.template
     
     # 创建新的PromptTemplate
@@ -98,11 +98,15 @@ def validate_province_input(user_input: str) -> tuple[bool, list]:
         return False, []
     
     # 检查是否是"所有省份"的关键词
-    if user_input in ["所有省份", "全部省份", "全国", "31个省份", "所有"]:
+    all_province_keywords = ["所有省份", "全部省份", "全国", "31个省份", "所有"]
+    if user_input in all_province_keywords:
         return True, VALID_PROVINCES
     
-    # 分割输入
-    provinces = [p.strip() for p in user_input.replace('，', ',').split(',')]
+    # 处理中文逗号，统一转换为英文逗号
+    normalized_input = user_input.replace('，', ',')
+    
+    # 分割输入并清理空格
+    provinces = [p.strip() for p in normalized_input.split(',')]
     provinces = [p for p in provinces if p]
     
     # 检查每个省份是否在有效列表中
@@ -118,11 +122,11 @@ def validate_province_input(user_input: str) -> tuple[bool, list]:
     return len(invalid_provinces) == 0, valid_provinces
 
 def process_user_input(user_input: str, agent_executor: AgentExecutor) -> str:
-    """处理用户输入，让Agent决定使用哪个工具"""
+    """处理用户输入并调用Agent"""
     try:
-        print(f"DEBUG: 用户输入: '{user_input}'")
+        print(f"用户输入: '{user_input}'")
         
-        # 验证输入格式
+        # 验证输入格式 - 这里已经验证了省份有效性
         is_valid, provinces = validate_province_input(user_input)
         
         if not is_valid:
@@ -131,48 +135,57 @@ def process_user_input(user_input: str, agent_executor: AgentExecutor) -> str:
         if not provinces:
             return "未识别到有效的省份名称，请重新输入"
         
-        # 直接让Agent处理，不指定具体工具
+        print(f"识别到 {len(provinces)} 个有效省份")
+        
+        # 直接让Agent处理，Agent会根据prompt规则选择工具
         response = agent_executor.invoke({
             "input": user_input
         })
         
         return response['output']
+        
     except Exception as e:
-        return f"处理请求时出错: {e}"
+        error_msg = f"处理请求时出错: {str(e)}"
+        print(error_msg)
+        return error_msg
 
 def main():
     """主函数"""
     print("=== 社会组织数据抓取Agent ===")
     print("\n欢迎使用！本系统可以帮您抓取各省份的社会组织数据。")
     
-    # 显示省份列表
     display_provinces()
     
     print("\n输入格式说明:")
     print("1. 单个省份: 直接输入省份名称，如: 北京市")
     print("2. 多个省份: 用逗号分隔，如: 北京市,上海市,广东省")
     print("3. 所有省份: 输入'所有省份'或'全国'抓取31个省份的全部数据")
-    print("4. 输入'退出'结束程序")
+    print("4. 退出程序: 输入'退出'")
     print("\n注意: 请严格按照上方列表中的省份名称输入！")
     
-    # 初始化Agent
+    print("\n初始化Agent中...")
     agent_executor = initialize_agent()
+    print("Agent初始化完成")
     
     while True:
-        user_input = input("\n请输入省份名称: ").strip()
-        
-        if user_input.lower() in ['退出', 'exit', 'quit']:
-            print("感谢使用，再见！")
-            break
-        
-        if not user_input:
-            print("请输入有效的省份名称")
-            continue
-        
         try:
-            # 让Agent处理请求
+            user_input = input("\n请输入省份名称: ").strip()
+            
+            exit_keywords = ['退出', 'exit', 'quit']
+            if user_input.lower() in exit_keywords:
+                print("感谢使用，再见！")
+                break
+            
+            if not user_input:
+                print("请输入有效的省份名称")
+                continue
+            
             response = process_user_input(user_input, agent_executor)
-            print(f"\n{response}")
+            print(f"\n执行结果:\n{response}") #在agent执行后打印结果
+            
+        except KeyboardInterrupt:
+            print("\n\n用户中断程序，再见！")
+            break
         except Exception as e:
             print(f"系统执行出错: {e}")
 
